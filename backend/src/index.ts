@@ -3,6 +3,9 @@ import express, { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { db, redis } from "./db";
 import { authRouter } from "./modules/auth/auth.routes";
+import { eventsRouter } from "./modules/events/events.routes";
+import { queueRouter } from "./modules/queue/queue.routes";
+import { startQueueWorker } from "./modules/queue/queue.worker";
 
 const PORT = Number(process.env.PORT ?? 8080);
 
@@ -30,7 +33,9 @@ app.get("/api/v1/health", async (_req, res) => {
 
 // ── Modul ──────────────────────────────────────────────
 app.use("/api/v1/auth", authRouter);
-// TODO: M1 queue, M2 identity/nik, M3 seats + orders, M4 tickets + gate
+app.use("/api/v1/events", eventsRouter);
+app.use("/api/v1/events/:eventId/queue", queueRouter); // M1
+// TODO: M2 identity/nik, M3 seats + orders, M4 tickets + gate
 //       sesuai docs/api/openapi.yaml
 
 // ── Penanganan error ───────────────────────────────────
@@ -53,4 +58,5 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(PORT, () => {
   console.log(`TicketPass API berjalan di http://localhost:${PORT}/api/v1`);
+  startQueueWorker();
 });

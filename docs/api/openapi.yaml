@@ -102,6 +102,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/QueueTicket'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Event tidak ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/TooMany'
   /events/{eventId}/queue/status:
@@ -122,6 +130,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/QueueStatus'
+        '404':
+          description: Token antrean tidak ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '410':
+          description: Jendela checkout habis, harus antre ulang
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events/{eventId}/queue/checkout:
+    get:
+      tags: [Queue]
+      summary: Cek checkout token masih berlaku (setelah di-admit antrean)
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - name: X-Checkout-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Token valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  expiresInSeconds:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /identity/nik/verify:
     post:
       tags: [Identity]
@@ -279,6 +324,12 @@ components:
   responses:
     Unauthorized:
       description: Token tidak valid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Akses ditolak (peran salah, penjualan belum dibuka, atau token checkout tidak valid)
       content:
         application/json:
           schema:
