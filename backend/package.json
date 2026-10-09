@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "smoke:queue": "node scripts/queue-smoke.mjs",
     "smoke:nik": "node scripts/nik-smoke.mjs",
-    "test:nik": "tsx scripts/nik-selftest.ts"
+    "test:nik": "tsx scripts/nik-selftest.ts",
+    "test:seat": "tsx scripts/seat-selftest.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
