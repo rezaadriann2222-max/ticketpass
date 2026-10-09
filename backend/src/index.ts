@@ -7,6 +7,8 @@ import { eventsRouter } from "./modules/events/events.routes";
 import { identityRouter } from "./modules/identity/identity.routes";
 import { queueRouter } from "./modules/queue/queue.routes";
 import { startQueueWorker } from "./modules/queue/queue.worker";
+import { seatRouter } from "./modules/seat/seat.routes";
+import { SeatError } from "./modules/seat/seat.service";
 
 const PORT = Number(process.env.PORT ?? 8080);
 
@@ -36,6 +38,7 @@ app.get("/api/v1/health", async (_req, res) => {
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/events", eventsRouter);
 app.use("/api/v1/events/:eventId/queue", queueRouter); // M1
+app.use("/api/v1/events/:eventId/seats", seatRouter); // M3
 app.use("/api/v1/identity", identityRouter); // M2
 // TODO: M3 seats + orders, M4 tickets + gate
 //       sesuai docs/api/openapi.yaml
@@ -47,6 +50,9 @@ app.use((_req, res) => {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof SeatError) {
+    return res.status(err.status).json({ code: err.code, message: err.message });
+  }
   if (err instanceof ZodError) {
     const message = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     return res.status(400).json({ code: "VALIDATION_ERROR", message });

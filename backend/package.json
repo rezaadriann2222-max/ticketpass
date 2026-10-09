@@ -10,7 +10,8 @@
     "smoke:queue": "node scripts/queue-smoke.mjs",
     "smoke:nik": "node scripts/nik-smoke.mjs",
     "test:nik": "tsx scripts/nik-selftest.ts",
-    "test:seat": "tsx scripts/seat-selftest.ts"
+    "test:seat": "tsx scripts/seat-selftest.ts",
+    "smoke:seat": "node scripts/seat-smoke.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
