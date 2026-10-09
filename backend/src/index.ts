@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import { db, redis } from "./db";
 import { authRouter } from "./modules/auth/auth.routes";
 import { eventsRouter } from "./modules/events/events.routes";
+import { identityRouter } from "./modules/identity/identity.routes";
 import { queueRouter } from "./modules/queue/queue.routes";
 import { startQueueWorker } from "./modules/queue/queue.worker";
 
@@ -35,7 +36,8 @@ app.get("/api/v1/health", async (_req, res) => {
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/events", eventsRouter);
 app.use("/api/v1/events/:eventId/queue", queueRouter); // M1
-// TODO: M2 identity/nik, M3 seats + orders, M4 tickets + gate
+app.use("/api/v1/identity", identityRouter); // M2
+// TODO: M3 seats + orders, M4 tickets + gate
 //       sesuai docs/api/openapi.yaml
 
 // ── Penanganan error ───────────────────────────────────

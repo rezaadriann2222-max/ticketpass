@@ -171,6 +171,15 @@ paths:
     post:
       tags: [Identity]
       summary: Verifikasi NIK dan cek kuota maksimal 2 tiket per NIK
+      description: |
+        Wajib sudah lolos antrean (header X-Checkout-Token). NIK dienkripsi AES-256-GCM
+        dan disimpan juga sebagai HMAC-SHA256; NIK polos tidak pernah dikembalikan atau dicatat.
+      parameters:
+        - name: X-Checkout-Token
+          in: header
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -197,8 +206,14 @@ paths:
                     type: integer
                     minimum: 0
                     maximum: 2
+        '400':
+          description: Format NIK tidak valid (INVALID_NIK / VALIDATION_ERROR)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
-          description: Kuota NIK habis atau NIK tidak valid
+          description: Token checkout tidak valid, atau kuota NIK habis (NIK_QUOTA_EXCEEDED)
           content:
             application/json:
               schema:

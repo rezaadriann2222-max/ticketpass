@@ -1,13 +1,15 @@
 {
   "name": "ticketpass-backend",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "smoke:queue": "node scripts/queue-smoke.mjs"
+    "smoke:queue": "node scripts/queue-smoke.mjs",
+    "smoke:nik": "node scripts/nik-smoke.mjs",
+    "test:nik": "tsx scripts/nik-selftest.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
