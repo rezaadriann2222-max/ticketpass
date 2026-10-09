@@ -1,0 +1,421 @@
+openapi: 3.0.3
+info:
+  title: TicketPass API
+  version: 1.0.0
+  description: |
+    API platform tiket konser skala besar dengan Virtual Waiting Room,
+    Anti-Scalper NIK Lock, Interactive Seat Picker, dan Dynamic Rolling QR E-Ticket.
+    NFR: >=10.000 user konkuren, seat lock < 50ms, zero double-booking.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Lokal (Linux/WSL Ubuntu)
+tags:
+  - name: Auth
+  - name: Queue
+    description: M1 Virtual Waiting Room
+  - name: Identity
+    description: M2 Anti-Scalper NIK Lock
+  - name: Seats
+    description: M3 Interactive Seat Picker
+  - name: Tickets
+    description: M4 Dynamic Rolling QR E-Ticket
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrasi pengguna
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Akun dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login dan terima JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Token JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /events:
+    get:
+      tags: [Seats]
+      summary: Daftar event konser
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+  /events/{eventId}/queue/join:
+    post:
+      tags: [Queue]
+      summary: Masuk ruang tunggu virtual
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Token antrean diterbitkan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueTicket'
+        '429':
+          $ref: '#/components/responses/TooMany'
+  /events/{eventId}/queue/status:
+    get:
+      tags: [Queue]
+      summary: Posisi antrean dan status admit
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - name: queueToken
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status antrean
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStatus'
+  /identity/nik/verify:
+    post:
+      tags: [Identity]
+      summary: Verifikasi NIK dan cek kuota maksimal 2 tiket per NIK
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventId, nik]
+              properties:
+                eventId:
+                  type: string
+                  format: uuid
+                nik:
+                  type: string
+                  pattern: '^[0-9]{16}$'
+      responses:
+        '200':
+          description: NIK valid dan masih ada kuota
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  remainingQuota:
+                    type: integer
+                    minimum: 0
+                    maximum: 2
+        '403':
+          description: Kuota NIK habis atau NIK tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events/{eventId}/seats:
+    get:
+      tags: [Seats]
+      summary: Denah dan status kursi
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Daftar kursi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Seat'
+  /events/{eventId}/seats/{seatId}/lock:
+    post:
+      tags: [Seats]
+      summary: Kunci kursi sementara 10 menit (Redis distributed lock)
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - name: seatId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Kursi terkunci
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatLock'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /orders:
+    post:
+      tags: [Tickets]
+      summary: Checkout kursi yang terkunci
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventId, lockIds]
+              properties:
+                eventId:
+                  type: string
+                  format: uuid
+                lockIds:
+                  type: array
+                  maxItems: 2
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '201':
+          description: Order dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+  /tickets/{ticketId}/qr:
+    get:
+      tags: [Tickets]
+      summary: QR code dinamis (berganti tiap 30 detik)
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payload QR saat ini
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RollingQR'
+  /gate/validate:
+    post:
+      tags: [Tickets]
+      summary: Validasi QR di gerbang masuk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qrPayload]
+              properties:
+                qrPayload:
+                  type: string
+      responses:
+        '200':
+          description: Tiket valid
+        '410':
+          description: QR kedaluwarsa atau sudah dipakai
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Unauthorized:
+      description: Token tidak valid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Konflik data (duplikat atau kursi sudah terkunci)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooMany:
+      description: Rate limit terlampaui
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        fullName:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        expiresIn:
+          type: integer
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [buyer, gate_staff, admin]
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        venue:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+    QueueTicket:
+      type: object
+      properties:
+        queueToken:
+          type: string
+        position:
+          type: integer
+    QueueStatus:
+      type: object
+      properties:
+        position:
+          type: integer
+        admitted:
+          type: boolean
+        checkoutToken:
+          type: string
+          nullable: true
+        estimatedWaitSeconds:
+          type: integer
+    Seat:
+      type: object
+      properties:
+        id:
+          type: string
+        section:
+          type: string
+        row:
+          type: string
+        number:
+          type: integer
+        price:
+          type: number
+        status:
+          type: string
+          enum: [available, locked, sold]
+    SeatLock:
+      type: object
+      properties:
+        lockId:
+          type: string
+          format: uuid
+        seatId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, paid, cancelled]
+        totalAmount:
+          type: number
+        ticketIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+    RollingQR:
+      type: object
+      properties:
+        payload:
+          type: string
+          description: Token bertanda tangan HMAC berisi ticketId + timestep
+        validUntil:
+          type: string
+          format: date-time
+        refreshInSeconds:
+          type: integer
+          example: 30
