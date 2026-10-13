@@ -38,7 +38,7 @@ services:
       retries: 10
 
   api:
-    build: ./api
+    build: ./backend
     restart: unless-stopped
     # tanpa container_name & tanpa published port agar bisa: docker compose up -d --scale api=3
     environment:
@@ -47,14 +47,13 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET}
-      NIK_HMAC_PEPPER: ${NIK_HMAC_PEPPER}
-      NIK_AES_KEY: ${NIK_AES_KEY}
+      NIK_ENCRYPTION_KEY: ${NIK_ENCRYPTION_KEY}
       MAX_TICKETS_PER_NIK: 2
       SEAT_LOCK_TTL_SECONDS: 600
       QR_WINDOW_SECONDS: 30
-    volumes:
-      - ./api:/app
-      - /app/node_modules
+      QUEUE_ADMIT_BATCH: 50
+      QUEUE_ADMIT_INTERVAL_MS: 5000
+      CHECKOUT_TTL_S: 600
     depends_on:
       postgres:
         condition: service_healthy
