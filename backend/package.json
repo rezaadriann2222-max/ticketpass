@@ -11,7 +11,8 @@
     "smoke:nik": "node scripts/nik-smoke.mjs",
     "test:nik": "tsx scripts/nik-selftest.ts",
     "test:seat": "tsx scripts/seat-selftest.ts",
-    "smoke:seat": "node scripts/seat-smoke.mjs"
+    "smoke:seat": "node scripts/seat-smoke.mjs",
+    "test:quota": "tsx scripts/quota-selftest.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

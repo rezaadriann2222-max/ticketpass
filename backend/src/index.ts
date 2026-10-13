@@ -9,6 +9,8 @@ import { queueRouter } from "./modules/queue/queue.routes";
 import { startQueueWorker } from "./modules/queue/queue.worker";
 import { seatRouter } from "./modules/seat/seat.routes";
 import { SeatError } from "./modules/seat/seat.service";
+import { OrderError, expirePendingOrders } from "./modules/order/order.service";
+import { orderRouter } from "./modules/order/order.routes";
 
 const PORT = Number(process.env.PORT ?? 8080);
 
@@ -40,6 +42,7 @@ app.use("/api/v1/events", eventsRouter);
 app.use("/api/v1/events/:eventId/queue", queueRouter); // M1
 app.use("/api/v1/events/:eventId/seats", seatRouter); // M3
 app.use("/api/v1/identity", identityRouter); // M2
+app.use("/api/v1", orderRouter); // M3 order
 // TODO: M3 seats + orders, M4 tickets + gate
 //       sesuai docs/api/openapi.yaml
 
@@ -51,6 +54,9 @@ app.use((_req, res) => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof SeatError) {
+    return res.status(err.status).json({ code: err.code, message: err.message });
+  }
+  if (err instanceof OrderError) {
     return res.status(err.status).json({ code: err.code, message: err.message });
   }
   if (err instanceof ZodError) {
@@ -67,4 +73,5 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 app.listen(PORT, () => {
   console.log(`TicketPass API berjalan di http://localhost:${PORT}/api/v1`);
   startQueueWorker();
+  setInterval(() => expirePendingOrders().catch(console.error), 60_000);
 });
