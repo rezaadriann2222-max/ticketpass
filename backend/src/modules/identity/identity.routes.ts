@@ -46,11 +46,11 @@ identityRouter.post(
     const remaining = MAX_TICKETS_PER_NIK - Number(rows[0].ticket_count);
 
     // Jejak audit tanpa NIK: hanya siapa, kapan, event mana, hasilnya apa.
-    await db.query("INSERT INTO audit_log (actor_id, action, entity) VALUES ($1, $2, $3)", [
-      userId,
-      remaining > 0 ? "nik.verify.ok" : "nik.verify.quota_exceeded",
-      `event:${eventId}`,
-    ]);
+   await db.query("INSERT INTO audit_log (actor, action, meta) VALUES ($1, $2, $3)", [
+  String(userId),
+  remaining > 0 ? "nik.verify.ok" : "nik.verify.quota_exceeded",
+  JSON.stringify({ eventId }),
+]);
 
     if (remaining <= 0) {
       return res.status(403).json({
