@@ -5,7 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TYPE seat_status  AS ENUM ('available', 'sold');
-CREATE TYPE order_status AS ENUM ('pending', 'paid', 'failed', 'expired');
+CREATE TYPE order_status AS ENUM ('pending', 'paid', 'failed', 'expired', 'cancelled');
 CREATE TYPE event_status AS ENUM ('draft', 'queue', 'on_sale', 'closed');
 CREATE TYPE user_role    AS ENUM ('buyer', 'admin', 'gate_staff');
 

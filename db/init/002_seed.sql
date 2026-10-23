@@ -7,7 +7,7 @@ VALUES (
   'Konser Demo TicketPass',
   'Istora Senayan, Jakarta',
   now() + interval '60 days',
-  now() + interval '1 day',
+  now() - interval '1 day',
   50,
   'on_sale'
 );
