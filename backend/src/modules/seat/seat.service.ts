@@ -72,7 +72,7 @@ export async function listSeats(
   }
 
   const seatsRes = await db.query(
-    `SELECT id, section, row_label, number, price
+    `SELECT id, section, row_label, seat_number AS number, price_idr AS price
        FROM seats WHERE event_id = $1
       ORDER BY section, row_label, number`,
     [eventId],
