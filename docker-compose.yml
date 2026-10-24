@@ -53,7 +53,7 @@ services:
       QR_WINDOW_SECONDS: 30
       QUEUE_ADMIT_BATCH: 50
       QUEUE_ADMIT_INTERVAL_MS: 5000
-      CHECKOUT_TTL_S: 600
+      CHECKOUT_TTL_S: 1800
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,6 +67,7 @@ services:
       - "8080:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/html:/usr/share/nginx/html:ro
     depends_on:
       - api
 
