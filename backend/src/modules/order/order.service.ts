@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { encryptTicketSecret } from "./ticket.secret";
 import { redis, db, withTx } from "../../db";
 import { seatLockKey, releaseSeatLock } from "../seat/seat.lock";
 import {
@@ -7,6 +8,8 @@ import {
   releaseQuota,
   MAX_TICKETS_PER_NIK,
 } from "../identity/identity.service";
+
+const ORDER_TTL_MINUTES = 15;
 
 /** Error dengan status HTTP dan kode, format { code, message } seperti SeatError */
 export class OrderError extends Error {
@@ -50,7 +53,7 @@ export async function createOrder(input: CreateOrderInput) {
   try {
     order = await withTx(async (c) => {
       const seats = await c.query(
-        "SELECT id, price FROM seats WHERE event_id = $1 AND id = ANY($2::uuid[])",
+       "SELECT id, price_idr AS price FROM seats WHERE event_id = $1 AND id = ANY($2::uuid[])",
         [eventId, seatIds],
       );
       if (seats.rows.length !== seatIds.length) {
@@ -58,11 +61,19 @@ export async function createOrder(input: CreateOrderInput) {
       }
       const total = seats.rows.reduce((sum: number, r: any) => sum + Number(r.price), 0);
 
+      const nik = await c.query(
+        "SELECT id FROM nik_registry WHERE event_id = $1 AND nik_hash = $2",
+        [eventId, nikHash],
+      );
+      if (nik.rows.length === 0) {
+        throw new OrderError(403, "NIK_NOT_VERIFIED", "NIK belum terdaftar untuk event ini");
+      }
+
       const o = await c.query(
-        `INSERT INTO orders (user_id, event_id, total_amount)
-         VALUES ($1, $2, $3)
-         RETURNING id, status, total_amount, created_at`,
-        [userId, eventId, total],
+        `INSERT INTO orders (user_id, event_id, nik_registry_id, ticket_qty, total_idr, expires_at)
+         VALUES ($1, $2, $3, $4, $5, now() + make_interval(mins => $6::int))
+         RETURNING id, status, total_idr, created_at, expires_at`,
+        [userId, eventId, nik.rows[0].id, seatIds.length, total, ORDER_TTL_MINUTES],
       );
       const orderId: string = o.rows[0].id;
 
@@ -75,14 +86,14 @@ export async function createOrder(input: CreateOrderInput) {
       }
 
       for (const seatId of seatIds) {
-        const it = await c.query(
+        await c.query(
           "INSERT INTO order_items (order_id, event_id, seat_id) VALUES ($1, $2, $3) RETURNING id",
           [orderId, eventId, seatId],
         );
-        await c.query("INSERT INTO tickets (order_item_id, secret) VALUES ($1, $2)", [
-          it.rows[0].id,
-          randomBytes(32).toString("hex"),
-        ]);
+        await c.query(
+          "INSERT INTO tickets (order_id, event_id, seat_id, secret_enc) VALUES ($1, $2, $3, $4)",
+          [orderId, eventId, seatId, encryptTicketSecret(randomBytes(32).toString("hex"))],
+        );
       }
       return o.rows[0];
     });
@@ -101,7 +112,7 @@ export async function createOrder(input: CreateOrderInput) {
   return {
     orderId: order.id as string,
     status: order.status as string,
-    totalAmount: Number(order.total_amount),
+    totalAmount: Number(order.total_idr),
     seatIds,
     createdAt: order.created_at,
   };

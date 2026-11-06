@@ -201,7 +201,7 @@ function vOrder(v){
   startCk();
   $('#back').onclick=()=>go(4);
   $('#buy').onclick=()=>run(async()=>{
-    S.order=await api(`/events/${S.event.id}/orders`,{m:'POST',h:{'X-Checkout-Token':S.ct},b:{eventId:S.event.id,lockIds:S.locks.map(l=>l.lockId)}});
+    S.order=await api(`/events/${S.event.id}/orders`,{m:'POST',h:{'X-Checkout-Token':S.ct},b:{eventId:S.event.id,seatIds:S.locks.map(l=>l.seatId)}});
     toast('Pesanan dibuat.',true);go(6)});
 }
 
