@@ -54,6 +54,7 @@ services:
       QUEUE_ADMIT_BATCH: 50
       QUEUE_ADMIT_INTERVAL_MS: 5000
       CHECKOUT_TTL_S: 1800
+      ALLOW_FAKE_PAYMENT: "true"
     depends_on:
       postgres:
         condition: service_healthy
