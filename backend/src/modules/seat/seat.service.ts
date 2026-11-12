@@ -5,6 +5,7 @@ import {
   releaseSeatLock,
   getSeatLockTtl,
   seatLockKey,
+  SEAT_LOCK_TTL_MS,
 } from "./seat.lock";
 
 /** Error dengan status HTTP dan kode, mengikuti format { code, message } milik M2 */
@@ -118,30 +119,38 @@ export async function lockSeat(
   assertUuid(eventId, "ID event");
   assertUuid(seatId, "ID kursi");
 
-  const seat = await db.query(
-    "SELECT 1 FROM seats WHERE id = $1 AND event_id = $2",
-    [seatId, eventId],
-  );
-  if ((seat.rowCount ?? 0) === 0) {
-    throw new SeatError(404, "SEAT_NOT_FOUND", "Kursi tidak ditemukan pada event ini");
-  }
-
-  if (await isSold(eventId, seatId)) {
-    throw new SeatError(409, "SEAT_SOLD", "Kursi sudah terjual");
-  }
-
+  // 1. Redis dulu (atomik, Lua): yang kalah ditolak tanpa menyentuh PostgreSQL
   const result = await acquireSeatLock(redis, eventId, seatId, userId);
   if (result === "TAKEN") {
     throw new SeatError(409, "SEAT_LOCKED", "Kursi sedang dipilih pembeli lain");
   }
 
-  // cek ulang: jika kursi terjual di sela-sela pengecekan, lepas lock
-  if (await isSold(eventId, seatId)) {
-    await releaseSeatLock(redis, eventId, seatId, userId);
-    throw new SeatError(409, "SEAT_SOLD", "Kursi sudah terjual");
+  // 2. Pemegang lock memvalidasi kursi dan status terjual dalam satu query
+  try {
+    const chk = await db.query(
+      `SELECT EXISTS (
+         SELECT 1 FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+          WHERE oi.event_id = $1 AND oi.seat_id = $2 AND o.status <> 'cancelled'
+       ) AS sold,
+       EXISTS (SELECT 1 FROM seats WHERE id = $2 AND event_id = $1) AS found`,
+      [eventId, seatId],
+    );
+    const { sold, found } = chk.rows[0];
+    if (!found || sold) {
+      if (result === "ACQUIRED") await releaseSeatLock(redis, eventId, seatId, userId);
+      if (!found) throw new SeatError(404, "SEAT_NOT_FOUND", "Kursi tidak ditemukan pada event ini");
+      throw new SeatError(409, "SEAT_SOLD", "Kursi sudah terjual");
+    }
+  } catch (e) {
+    if (!(e instanceof SeatError) && result === "ACQUIRED") {
+      await releaseSeatLock(redis, eventId, seatId, userId).catch(() => false);
+    }
+    throw e;
   }
 
-  const ttl = await getSeatLockTtl(redis, eventId, seatId);
+  // 3. expiresAt dari TTL tetap, tanpa round-trip Redis tambahan
+  const ttl = result === "ACQUIRED" ? SEAT_LOCK_TTL_MS : await getSeatLockTtl(redis, eventId, seatId);
   const expiresAt = new Date(Date.now() + Math.max(ttl, 0)).toISOString();
   return { lockId: lockIdFor(eventId, seatId, userId), seatId, expiresAt };
 }

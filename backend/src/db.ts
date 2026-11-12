@@ -2,7 +2,7 @@ import "dotenv/config";
 import { Pool, PoolClient } from "pg";
 import Redis from "ioredis";
 
-export const db = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = new Pool({ connectionString: process.env.DATABASE_URL, max: Number(process.env.PG_POOL_MAX ?? 30) });
 
 export const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
   lazyConnect: true,
