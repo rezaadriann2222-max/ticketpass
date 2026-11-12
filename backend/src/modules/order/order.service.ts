@@ -85,17 +85,19 @@ export async function createOrder(input: CreateOrderInput) {
         throw new OrderError(403, "NIK_NOT_VERIFIED", "NIK belum terdaftar untuk event ini");
       }
 
+      const ticketIds: string[] = [];
       for (const seatId of seatIds) {
         await c.query(
           "INSERT INTO order_items (order_id, event_id, seat_id) VALUES ($1, $2, $3) RETURNING id",
           [orderId, eventId, seatId],
         );
-        await c.query(
-          "INSERT INTO tickets (order_id, event_id, seat_id, secret_enc) VALUES ($1, $2, $3, $4)",
+        const tk = await c.query(
+          "INSERT INTO tickets (order_id, event_id, seat_id, secret_enc) VALUES ($1, $2, $3, $4) RETURNING id",
           [orderId, eventId, seatId, encryptTicketSecret(randomBytes(32).toString("hex"))],
         );
+        ticketIds.push(tk.rows[0].id);
       }
-      return o.rows[0];
+      return { ...o.rows[0], ticketIds };
     });
   } catch (e: any) {
     if (e?.code === "23505") {
@@ -115,6 +117,7 @@ export async function createOrder(input: CreateOrderInput) {
     totalAmount: Number(order.total_idr),
     seatIds,
     createdAt: order.created_at,
+    ticketIds: order.ticketIds as string[],
   };
 }
 
@@ -130,7 +133,7 @@ export async function payOrder(userId: string, orderId: string) {
       throw new OrderError(409, "ORDER_CANCELLED", "Order sudah dibatalkan");
     }
     if (status === "pending") {
-      await c.query("UPDATE orders SET status = 'paid' WHERE id = $1", [orderId]);
+      await c.query("UPDATE orders SET status = 'paid', paid_at = now() WHERE id = $1", [orderId]);
     }
     return { orderId, status: "paid" as const };
   });

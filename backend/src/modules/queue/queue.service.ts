@@ -43,8 +43,21 @@ export async function joinQueue(eventId: string, userId: string) {
   const created = await redis.set(ownerKey, candidate, "EX", cfg.queueTtlS, "NX");
   let token = candidate;
   if (created !== "OK") {
-    token = (await redis.get(ownerKey)) ?? candidate;
-  } else {
+    const existing = await redis.get(ownerKey);
+    if (existing) {
+      const stillQueued = (await redis.zrank(k.zset(eventId), existing)) !== null;
+      const admitted = await redis.get(k.admitted(existing));
+      if (stillQueued || admitted) {
+        token = existing; // token lama masih hidup, pakai ulang (idempoten)
+      } else {
+        // token lama sudah mati (jendela checkout habis): terbitkan yang baru
+        await redis.set(ownerKey, candidate, "EX", cfg.queueTtlS);
+      }
+    } else {
+      await redis.set(ownerKey, candidate, "EX", cfg.queueTtlS);
+    }
+  }
+  if (token === candidate) {
     const seq = await redis.incr(k.seq(eventId));
     const meta: QueueMeta = { eventId, userId };
     await redis
@@ -54,6 +67,7 @@ export async function joinQueue(eventId: string, userId: string) {
       .sadd(k.active, eventId)
       .exec();
   }
+
   const rank = await redis.zrank(k.zset(eventId), token);
   return { queueToken: token, position: rank === null ? 0 : rank + 1 };
 }

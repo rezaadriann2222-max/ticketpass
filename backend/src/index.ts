@@ -11,6 +11,7 @@ import { seatRouter } from "./modules/seat/seat.routes";
 import { SeatError } from "./modules/seat/seat.service";
 import { OrderError, expirePendingOrders } from "./modules/order/order.service";
 import { orderRouter } from "./modules/order/order.routes";
+import { ticketRouter } from "./modules/ticket/ticket.routes";
 
 const PORT = Number(process.env.PORT ?? 8080);
 
@@ -42,7 +43,8 @@ app.use("/api/v1/events", eventsRouter);
 app.use("/api/v1/events/:eventId/queue", queueRouter); // M1
 app.use("/api/v1/events/:eventId/seats", seatRouter); // M3
 app.use("/api/v1/identity", identityRouter); // M2
-app.use("/api/v1", orderRouter); // M3 order
+app.use("/api/v1", orderRouter);
+app.use("/api/v1", ticketRouter); // M4 tiket + gerbang // M3 order
 // TODO: M3 seats + orders, M4 tickets + gate
 //       sesuai docs/api/openapi.yaml
 

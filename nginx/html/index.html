@@ -62,6 +62,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <nav id="nav"></nav>
 <main><section class="stub" id="view" aria-live="polite"></section></main>
 <div id="toast" role="alert"></div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 const API='/api/v1';
 const STEPS=['Masuk','Event','Antrean','NIK','Kursi','Pesan','Tiket'];
@@ -202,10 +203,11 @@ function vOrder(v){
   $('#back').onclick=()=>go(4);
   $('#buy').onclick=()=>run(async()=>{
     S.order=await api(`/events/${S.event.id}/orders`,{m:'POST',h:{'X-Checkout-Token':S.ct},b:{eventId:S.event.id,seatIds:S.locks.map(l=>l.seatId)}});
-    toast('Pesanan dibuat.',true);go(6)});
+    S.order.id=S.order.orderId;const p=await api(`/orders/${S.order.id}/pay`,{m:'POST'});S.order.status=p.status;toast('Pesanan dibayar.',true);go(6)});
 }
 
 /* 6 Tiket */
+function qrSvg(t){try{const q=qrcode(0,'M');q.addData(t);q.make();return q.createSvgTag({cellSize:6,margin:0})}catch(e){return '<p>QR gagal dibuat</p>'}}
 function vTicket(v){
   const ids=S.order.ticketIds||[];let cur=0;
   v.innerHTML=`<h2>Tiketmu</h2><p class="sub">Pesanan ${esc(S.order.id)} - ${esc(S.order.status)} - ${rp(S.order.totalAmount)}</p>
@@ -218,7 +220,7 @@ function vTicket(v){
   const load=()=>run(async()=>{
     if(!ids[cur]){$('#qr').innerHTML='<p>Tiket belum tersedia.</p>';return}
     const q=await api(`/tickets/${ids[cur]}/qr`);total=q.refreshInSeconds||30;left=total;paint(q)});
-  function paint(q){$('#qr').innerHTML=`<div class="qr">${esc(q.payload)}</div><div class="bar"><i id="b" style="width:${left/total*100}%"></i></div><p class="sub" id="t">QR berganti dalam ${left} detik</p>`;
+  function paint(q){$('#qr').innerHTML=`<div class="qr" style="background:#fff;padding:14px;border-radius:12px;display:inline-block;line-height:0;color:#000">${qrSvg(q.payload)}</div><div class="bar"><i id="b" style="width:${left/total*100}%"></i></div><p class="sub" id="t">QR berganti dalam ${left} detik</p>`;
     clearT();every(()=>{left--;if(left<=0){load();return}const b=$('#b'),t=$('#t');if(b)b.style.width=left/total*100+'%';if(t)t.textContent='QR berganti dalam '+left+' detik'},1000)}
   tabs();load();
 }

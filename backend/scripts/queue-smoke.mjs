@@ -2,7 +2,7 @@
 // Jalankan setelah server hidup:  npm run smoke:queue
 // Opsi: SMOKE_USERS=60 BASE=http://localhost:8080/api/v1 EVENT_ID=<uuid>
 const BASE = process.env.BASE ?? "http://localhost:8080/api/v1";
-const EVENT_ID = process.env.EVENT_ID ?? "11111111-1111-1111-1111-111111111111";
+const EVENT_ID = process.env.EVENT_ID ?? "00000000-0000-0000-0000-000000000001";
 const FUTURE_EVENT_ID = "22222222-2222-2222-2222-222222222222";
 const N = Number(process.env.SMOKE_USERS ?? 60);
 const run = Date.now().toString(36);
