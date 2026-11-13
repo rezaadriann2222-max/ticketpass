@@ -170,23 +170,54 @@ function vNik(v){
 /* 4 Kursi */
 async function vSeats(v){
   v.innerHTML='<h2>Pilih kursi</h2><p class="sub">Memuat denah...</p>';
+  const H={'X-Checkout-Token':S.ct};
+  const CS=22,G=4,LW=34;
+  const load=()=>api(`/events/${S.event.id}/seats`,{h:H});
   await run(async()=>{
-    S.seats=await api(`/events/${S.event.id}/seats`,{h:{'X-Checkout-Token':S.ct}});S.locks=[];draw();startCk();
+    S.seats=await load();S.locks=[];draw();startCk();
+    every(()=>{if(S.step!==4)return;load().then(x=>{S.seats=x;draw()}).catch(()=>{})},5000);
   });
+  function col(s,m){return m?'#4f46e5':s.status==='available'?'#e0e7ff':s.status==='locked'?'#fbbf24':'#9ca3af'}
+  function svgFor(list,mine){
+    const rows={};list.forEach(s=>(rows[s.rowLabel||s.row||'']=rows[s.rowLabel||s.row||'']||[]).push(s));
+    const keys=Object.keys(rows).sort();
+    const maxN=Math.max(...keys.map(k=>rows[k].length));
+    const w=LW+maxN*(CS+G),hh=keys.length*(CS+G);
+    const body=keys.map((k,r)=>{
+      const y=r*(CS+G);
+      const seats=rows[k].sort((p,q)=>p.number-q.number).map((s,i)=>{
+        const m=mine.has(s.id),ok=m||s.status==='available',x=LW+i*(CS+G);
+        const t=`${s.section} ${k}${s.number} - ${rp(s.price)}`;
+        return `<g ${ok?`class="st" data-id="${esc(s.id)}" tabindex="0" role="button" style="cursor:pointer"`:''} aria-label="${esc(t)}">`+
+          `<title>${esc(t)}</title><rect x="${x}" y="${y}" width="${CS}" height="${CS}" rx="5" fill="${col(s,m)}" stroke="${m?'#312e81':'#6b7280'}" stroke-width="1"/>`+
+          `<text x="${x+CS/2}" y="${y+CS/2+3}" text-anchor="middle" font-size="9" fill="${m?'#fff':'#111'}" style="pointer-events:none">${s.number}</text></g>`}).join('');
+      return `<text x="0" y="${y+CS/2+4}" font-size="11" fill="#555">${esc(k)}</text>`+seats}).join('');
+    return `<svg viewBox="0 0 ${w} ${hh}" style="width:100%;max-width:${Math.round(w*1.5)}px;height:auto" role="group">${body}</svg>`;
+  }
   function draw(){
     const by={};S.seats.forEach(s=>(by[s.section]=by[s.section]||[]).push(s));
     const mine=new Set(S.locks.map(l=>l.seatId));
-    v.innerHTML=`<h2>Pilih kursi</h2><p class="sub">Maksimal ${S.quota} kursi. Kursi dikunci 10 menit. ${ckChip}</p>`+
-    Object.keys(by).map(sec=>`<div class="sec">${esc(sec)}</div><div class="seats">`+by[sec].map(s=>{
-      const m=mine.has(s.id),cls=m?'mine':s.status==='available'?'':s.status;
-      return `<button class="seat ${cls}" data-id="${esc(s.id)}" ${!m&&s.status!=='available'?'disabled':''} title="${rp(s.price)}">${esc(s.row)}${esc(s.number)}</button>`}).join('')+'</div>').join('')+
+    const dot=(c,t)=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px"><i style="width:12px;height:12px;border-radius:3px;background:${c};border:1px solid #6b7280;display:inline-block"></i>${t}</span>`;
+    v.innerHTML=`<h2>Pilih kursi</h2><p class="sub">Maksimal ${S.quota} kursi. Klik kursi untuk memilih, klik lagi untuk melepas. Dikunci 10 menit. ${ckChip}</p>`+
+    `<div style="text-align:center;background:#111827;color:#fff;border-radius:8px;padding:6px;margin:8px 0;font-size:12px;letter-spacing:3px">PANGGUNG</div>`+
+    `<div style="margin:6px 0;font-size:12px">${dot('#e0e7ff','Tersedia')}${dot('#4f46e5','Pilihanmu')}${dot('#fbbf24','Dipilih orang lain')}${dot('#9ca3af','Terjual')}</div>`+
+    Object.keys(by).map(sec=>`<div class="sec">${esc(sec)}</div>`+svgFor(by[sec],mine)).join('')+
     `<div class="row"><button id="next" ${S.locks.length?'':'disabled'}>Lanjut ke pemesanan (${S.locks.length})</button></div>`;
-    v.querySelectorAll('.seat').forEach(b=>b.onclick=()=>run(async()=>{
-      const id=b.dataset.id;
-      if(mine.has(id))return;
-      if(S.locks.length>=S.quota){toast('Kuotamu '+S.quota+' kursi.');return}
-      const l=await api(`/events/${S.event.id}/seats/${encodeURIComponent(id)}/lock`,{m:'POST',h:{'X-Checkout-Token':S.ct}});
-      S.locks.push({lockId:l.lockId,seatId:id});draw()}));
+    v.querySelectorAll('.st').forEach(g=>{
+      const act=()=>run(async()=>{
+        const id=g.dataset.id,url=`/events/${S.event.id}/seats/${encodeURIComponent(id)}/lock`;
+        if(mine.has(id)){
+          await api(url,{m:'DELETE',h:H});
+          S.locks=S.locks.filter(l=>l.seatId!==id);
+          const sv=S.seats.find(x=>x.id===id);if(sv)sv.status='available';
+          draw();return}
+        if(S.locks.length>=S.quota){toast('Kuotamu '+S.quota+' kursi.');return}
+        try{const l=await api(url,{m:'POST',h:H});S.locks.push({lockId:l.lockId,seatId:id})}
+        catch(e){try{S.seats=await load()}catch(_){}draw();throw e}
+        draw()});
+      g.onclick=act;
+      g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();act()}};
+    });
     $('#next').onclick=()=>go(5);
     const c=$('#ck');if(c&&S.lastCk)c.textContent=S.lastCk;
   }
@@ -197,7 +228,7 @@ function vOrder(v){
   const rows=S.locks.map(l=>{const s=S.seats.find(x=>x.id===l.seatId)||{};return {s,l}});
   const total=rows.reduce((a,r)=>a+Number(r.s.price||0),0);
   v.innerHTML=`<h2>Konfirmasi pesanan</h2><p class="sub">${esc(S.event.name)} ${ckChip}</p>`+
-  rows.map(r=>`<div class="ev"><div><b>${esc(r.s.section)} ${esc(r.s.row)}${esc(r.s.number)}</b></div><span>${rp(r.s.price)}</span></div>`).join('')+
+  rows.map(r=>`<div class="ev"><div><b>${esc(r.s.section)} ${esc(r.s.rowLabel||r.s.row||'')}${esc(r.s.number)}</b></div><span>${rp(r.s.price)}</span></div>`).join('')+
   `<div class="ev"><b>Total</b><b>${rp(total)}</b></div><div class="row"><button id="buy">Bayar pesanan</button><button class="ghost" id="back">Ubah kursi</button></div>`;
   startCk();
   $('#back').onclick=()=>go(4);
