@@ -154,6 +154,7 @@ export async function cancelOrder(userId: string, orderId: string) {
     if (status === "paid") {
       throw new OrderError(409, "ORDER_PAID", "Order yang sudah dibayar diproses lewat refund");
     }
+    await c.query("DELETE FROM tickets WHERE order_id = $1", [orderId]);
     await c.query("DELETE FROM order_items WHERE order_id = $1", [orderId]);
     await releaseQuota(c, orderId);
     await c.query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [orderId]);
