@@ -72,8 +72,9 @@ Skrip lain: `smoke:queue`, `smoke:nik`, `test:nik`, `test:seat`, `test:quota` (l
 | Pemindaian kedua pada tiket yang sama | 410 TICKET_USED |
 | Pemindaian oleh akun buyer | 403 |
 | Latensi lock kursi p95 (100 pengguna) | 467 ms sebelum optimasi, 141 ms sesudah |
+| Validasi gerbang p95 (100 pemindaian paralel, 1 tiket) | 203,3 ms sebelum optimasi; 163,2 dan 141,0 ms sesudah (2 run, target < 200 ms); tepat 1 valid, 99 ditolak |
 
-Keterbatasan: target lock < 50 ms belum tercapai; konkurensi 10.000 pengguna belum diuji (skala teruji 100); klien uji dan server berjalan di mesin yang sama sehingga angka latensi ikut dipengaruhi persaingan CPU.
+Keterbatasan: target lock < 50 ms belum tercapai (validasi gerbang < 200 ms tercapai pada kondisi uji lokal); konkurensi 10.000 pengguna belum diuji (skala teruji 100); klien uji dan server berjalan di mesin yang sama sehingga angka latensi ikut dipengaruhi persaingan CPU.
 
 ## Struktur repositori
 

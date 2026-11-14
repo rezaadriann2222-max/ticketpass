@@ -29,6 +29,9 @@ Kata kunci: virtual queue, distributed lock, Redis, PostgreSQL, anti-scalper, QR
 - Perbaikan: Redis lebih dulu, satu query validasi, pool 30
 - Sesudah: 82 ms (20), 141 ms (100)
 4.4 Keamanan QR (QR_EXPIRED, QR_INVALID, TICKET_USED, 403)
+- Latensi validasi gerbang (100 pemindaian paralel pada satu tiket): p95 203,3 ms sebelum optimasi; setelah kunci HKDF di-cache, p95 163,2 ms dan 141,0 ms pada dua run (target SRS < 200 ms).
+- Hasil atomik: tepat 1 pemindaian valid, 99 ditolak TICKET_USED (UPDATE ... WHERE used_at IS NULL).
+- Catatan: klien dan server satu mesin, lewat nginx, 20 thread paralel.
 4.5 Temuan bug selama integrasi: skema dan kode tidak cocok; tiket order batal menahan kursi
 4.6 Keterbatasan: target 50 ms belum tercapai, 10.000 pengguna belum diuji, klien dan server satu mesin, pembayaran simulasi
 
