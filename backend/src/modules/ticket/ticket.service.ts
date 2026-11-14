@@ -8,12 +8,15 @@ const STEP_MS = QR_STEP_SECONDS * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Kunci HMAC QR diturunkan (HKDF) dari NIK_ENCRYPTION_KEY dengan label terpisah. */
+let _hmacKey: Buffer | null = null;
 function hmacKey(): Buffer {
+  if (_hmacKey) return _hmacKey;
   const hex = process.env.NIK_ENCRYPTION_KEY ?? "";
   if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
     throw new Error("NIK_ENCRYPTION_KEY harus 64 karakter hex");
   }
-  return Buffer.from(hkdfSync("sha256", Buffer.from(hex, "hex"), Buffer.alloc(0), "qr-hmac", 32));
+  _hmacKey = Buffer.from(hkdfSync("sha256", Buffer.from(hex, "hex"), Buffer.alloc(0), "qr-hmac", 32));
+  return _hmacKey;
 }
 
 function sign(ticketId: string, step: number, secret: string): string {
